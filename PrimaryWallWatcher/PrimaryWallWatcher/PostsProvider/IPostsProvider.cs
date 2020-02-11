@@ -1,9 +1,10 @@
 ﻿using System;
 using System.Collections.Generic;
-using VkNet.Enums.SafetyEnums;
 using JetBrains.Annotations;
+using PostsProvider;
+using VkNet.Enums.SafetyEnums;
 
-namespace PostsProvider
+namespace PrimaryWallWatcher.PostsProvider
 {
     public interface IPostsProvider
     {

@@ -13,10 +13,15 @@ namespace VkNetExtend.WallWatcher.Models
 
         public PostsCollection()
         {
-            foreach (PostType postType in Enum.GetValues(typeof(PostType)))
+            /*foreach (var postType in Enum.GetValues(typeof(PostType)))
             {
                 _collection.Add(postType, new List<Post>());
-            }
+            }*/
+            _collection.Add(PostType.Copy, new List<Post>());
+            _collection.Add(PostType.Post, new List<Post>());
+            _collection.Add(PostType.Postpone, new List<Post>());
+            _collection.Add(PostType.Reply, new List<Post>());
+            _collection.Add(PostType.Suggest, new List<Post>());
         }
 
         public ICollection<Post> this[PostType type]

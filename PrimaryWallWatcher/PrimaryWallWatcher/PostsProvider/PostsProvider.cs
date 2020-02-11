@@ -1,16 +1,12 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Text;
 using System.Linq;
+using PostsProvider;
+using PrimaryWallWatcher.PostsProvider;
 using VkNet.Enums.SafetyEnums;
-using VkNet.Model.Attachments;
-using VkNetExtend.WallWatcher.Models;
 
-using JetBrains.Annotations;
-
-namespace PostsProvider
+namespace PrimaryWallWatcher.PostsProvider
 {
-    
     public class PostsProvider : IPostsProvider
     {
         // wallId - Dict<postId, post>

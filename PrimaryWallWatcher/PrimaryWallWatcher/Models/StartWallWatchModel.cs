@@ -1,8 +1,7 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Text;
+using VkNetExtend.WallWatcher.Models;
 
-namespace VkNetExtend.WallWatcher.Models
+namespace PrimaryWallWatcher.Models
 {
     public class StartWallWatchModel
     {

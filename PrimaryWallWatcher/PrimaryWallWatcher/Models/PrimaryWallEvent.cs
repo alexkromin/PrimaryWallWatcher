@@ -1,9 +1,7 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Text;
-using VkNet.Model.Attachments;
+﻿using VkNet.Model.Attachments;
+using VkNetExtend.WallWatcher.Models;
 
-namespace VkNetExtend.WallWatcher.Models
+namespace PrimaryWallWatcher.Models
 {
     public class PrimaryWallEvent
     {

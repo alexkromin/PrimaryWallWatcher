@@ -3,7 +3,9 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 16
 VisualStudioVersion = 16.0.29613.14
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PrimaryWallWatcher", "PrimaryWallWatcher\PrimaryWallWatcher.csproj", "{4320E65E-511A-4D8B-8C2E-961BE11B2B93}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "PrimaryWallWatcher", "PrimaryWallWatcher\PrimaryWallWatcher.csproj", "{4320E65E-511A-4D8B-8C2E-961BE11B2B93}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "VkNet", "..\..\..\Github\VkNet\VkNet\VkNet.csproj", "{2E7C316D-1616-4B9B-A6B5-057A33288483}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -15,6 +17,10 @@ Global
 		{4320E65E-511A-4D8B-8C2E-961BE11B2B93}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{4320E65E-511A-4D8B-8C2E-961BE11B2B93}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{4320E65E-511A-4D8B-8C2E-961BE11B2B93}.Release|Any CPU.Build.0 = Release|Any CPU
+		{2E7C316D-1616-4B9B-A6B5-057A33288483}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{2E7C316D-1616-4B9B-A6B5-057A33288483}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{2E7C316D-1616-4B9B-A6B5-057A33288483}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{2E7C316D-1616-4B9B-A6B5-057A33288483}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
