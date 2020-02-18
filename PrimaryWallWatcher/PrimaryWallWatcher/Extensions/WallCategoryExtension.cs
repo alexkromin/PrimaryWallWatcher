@@ -1,72 +1,80 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Text;
+using Flurl.Http;
+using Microsoft.Extensions.Logging;
 using VkNet.Abstractions;
-using VkNet.Enums.SafetyEnums;
 using VkNet.Exception;
 using VkNet.Model;
 using VkNet.Model.Attachments;
 using VkNetExtend.WallWatcher.Models;
 
-namespace VkNet
+namespace PrimaryWallWatcher.Extensions
 {
-    public static class WallCategoryExtension // TODO: Add logger
+    public static class WallCategoryExtension
     {
-        private const int MAX_LOAD_COUNT = 100;
-        public static List<Post> GetPosts(this IWallCategory wall, long wallId, int countInFirstLoad, WallFilter wallFilter)
+        private const int MaxLoadCount = 100;
+        private static readonly string NewLine = Environment.NewLine;
+
+        public static List<Post> GetPosts(this IWallCategory wall,
+            ILogger logger,
+            DownloadingPostsOptions downloadingPostsOptions)
         {
             List<Post> res = new List<Post>();
             ulong offset = 0;
-            int loadCount = countInFirstLoad;
+            int loadCount = downloadingPostsOptions.CountInFirstLoad;
             while (true)
             {
-                WallGetObject wallPosts = LoadPosts(wall, wallId, wallFilter, loadCount, offset);
+                WallGetObject wallPosts = LoadPosts(wall, logger, downloadingPostsOptions, loadCount, offset);
                 foreach (var post in wallPosts.WallPosts)
                     res.Add(post);
 
                 if (wallPosts.WallPosts.Count < loadCount)
                     break;
                 offset += (ulong)loadCount;
-                loadCount = MAX_LOAD_COUNT;
+                loadCount = MaxLoadCount;
             }
             return res;
         }
 
-        public static List<Post> GetPosts(this IWallCategory wall, long wallId, int countInFirstLoad, WallFilter wallFilter, long border)
+        public static List<Post> GetPosts(this IWallCategory wall,
+            ILogger logger,
+            DownloadingPostsOptions downloadingPostsOptions,
+            long border)
         {
             List<Post> res = new List<Post>();
-            bool flag = true;
+            bool allPostsReceived = true;
             ulong offset = 0;
-            int loadCount = countInFirstLoad;
-            while (flag)
+            int loadCount = downloadingPostsOptions.CountInFirstLoad;
+            while (allPostsReceived)
             {
-                WallGetObject wallPosts = LoadPosts(wall, wallId, wallFilter, loadCount, offset);
-                res.AddRange(SelectionLoadedPosts(wallPosts, ref flag, border));
+                WallGetObject wallPosts = LoadPosts(wall, logger, downloadingPostsOptions, loadCount, offset);
+                res.AddRange(SelectionLoadedPosts(wallPosts, ref allPostsReceived, border));
 
-                if (wallPosts.WallPosts.Count < countInFirstLoad)
-                    flag = false;
-                offset += (ulong)countInFirstLoad;
-                loadCount = MAX_LOAD_COUNT;
+                if (wallPosts.WallPosts.Count < downloadingPostsOptions.CountInFirstLoad)
+                    allPostsReceived = false;
+                offset += (ulong)downloadingPostsOptions.CountInFirstLoad;
+                loadCount = MaxLoadCount;
             }
             return res;
         }
 
         /// <summary>
-        /// Загрузка постов с определенного fromId по лимитам установленным в модели (Все посты за период ИЛИ заданное кол-во постов)
+        /// Загрузка постов по лимитам установленным в модели (Все посты за период ИЛИ заданное кол-во постов)
         /// </summary>
         /// <param name="wall"></param>
-        /// <param name="wallId"></param>
-        /// <param name="countInFirstLoad"></param>
-        /// <param name="wallFilter"></param>
+        /// <param name="downloadingPostsOptions"></param>
         /// <param name="monitoringLimits"></param>
-        /// <param name="fromId"></param>
+        /// <param name="logger"></param>
         /// <returns></returns>
-        public static List<Post> GetPosts(this IWallCategory wall, long wallId, int countInFirstLoad, WallFilter wallFilter, MonitoringLimits monitoringLimits, long fromId)
+        public static List<Post> GetPosts(this IWallCategory wall,
+            ILogger logger,
+            DownloadingPostsOptions downloadingPostsOptions,
+            MonitoringLimits monitoringLimits)
         {
             List<Post> res = new List<Post>();
-            int loadCount = countInFirstLoad;
-            bool allPostsRecieved = true;
+            int loadCount = downloadingPostsOptions.CountInFirstLoad;
+            bool allPostsReceived = true;
             ulong offset = 0;
             long? monitoringNumBorder = null;
             DateTime? monitoringTimeBorder = null;
@@ -76,43 +84,36 @@ namespace VkNet
             if (monitoringLimits.MonitoringPeriod != null)
                 monitoringTimeBorder = DateTime.UtcNow - monitoringLimits.MonitoringPeriod;
 
-            while (allPostsRecieved)
+            while (allPostsReceived)
             {
-                WallGetObject wallPosts = LoadPosts(wall, wallId, wallFilter, loadCount, offset);
+                WallGetObject wallPosts = LoadPosts(wall, logger, downloadingPostsOptions, loadCount, offset);
                 if (wallPosts.WallPosts.Count != 0)
                 {
                     if (monitoringNumBorder == null)
-                        res.AddRange(SelectionLoadedPosts(wallPosts, ref allPostsRecieved, monitoringTimeBorder.Value));
+                        res.AddRange(SelectionLoadedPosts(wallPosts, ref allPostsReceived, monitoringTimeBorder.Value));
                     else if (monitoringTimeBorder == null)
-                        res.AddRange(SelectionLoadedPosts(wallPosts, ref allPostsRecieved, ref monitoringNumBorder, monitoringLimits.MonitoringLimit.Value));
+                        res.AddRange(SelectionLoadedPosts(wallPosts, ref allPostsReceived, ref monitoringNumBorder, monitoringLimits.MonitoringLimit.Value));
                     else
-                        res.AddRange(SelectionLoadedPosts(wallPosts, ref allPostsRecieved, monitoringTimeBorder.Value, ref monitoringNumBorder, monitoringLimits.MonitoringLimit.Value));
+                        res.AddRange(SelectionLoadedPosts(wallPosts, ref allPostsReceived, monitoringTimeBorder.Value, ref monitoringNumBorder, monitoringLimits.MonitoringLimit.Value));
 
                     if (wallPosts.WallPosts.Count < loadCount)
-                        allPostsRecieved = false;
+                        allPostsReceived = false;
                     offset += (ulong)loadCount;
-                    loadCount = MAX_LOAD_COUNT;
+                    loadCount = MaxLoadCount;
                 }
             }
 
-            // отсекаем все первые элементы перед постом с id = fromId
-            int i = 0;
-            if (fromId != 0)
-            {
-                while (i < res.Count && res.ElementAt(i).Id >= fromId)
-                    i++;
-            }
-            return res.Skip(i).ToList();
+            return res;
         }
 
         /// <summary>
-        /// Из загруженных постов выбирает все, начиная с самого нового и заканчивая постоv с id=border
+        /// Из загруженных постов выбирает сверху все, начиная с самого нового и заканчивая постом с id=border
         /// </summary>
         /// <param name="wallPosts">Посты, из которых надо выбрать необходимые</param>
-        /// <param name="allPostsRecieved">Флаг, отвечающий, что все необходимые посты выбраны</param>
+        /// <param name="allPostsReceived">Флаг, отвечающий, что все необходимые посты выбраны</param>
         /// <param name="border">id последнего поста, который нужно выбрать</param>
         /// <returns></returns>
-        private static List<Post> SelectionLoadedPosts(WallGetObject wallPosts, ref bool allPostsRecieved, long border)
+        private static List<Post> SelectionLoadedPosts(WallGetObject wallPosts, ref bool allPostsReceived, long border)
         {
             List<Post> res = new List<Post>();
             for (int i = 0; i < wallPosts.WallPosts.Count; i++)
@@ -122,7 +123,7 @@ namespace VkNet
                     res.Add(post);
                 else
                 {
-                    allPostsRecieved = false;
+                    allPostsReceived = false;
                     break;
                 }
             }
@@ -133,10 +134,10 @@ namespace VkNet
         /// Из загруженных постов выбирает все, начиная с самого нового и заканчивая постом с датой публикации не больше monitoringTimeBorder
         /// </summary>
         /// <param name="wallPosts">Посты, из которых надо выбрать необходимые</param>
-        /// <param name="allPostsRecieved">Флаг, отвечающий, что все необходимые посты выбраны</param>
-        /// <param name="border">id последнего поста, который нужно выбрать</param>
+        /// <param name="allPostsReceived">Флаг, отвечающий, что все необходимые посты выбраны</param>
+        /// <param name="monitoringTimeBorder">Временная граница</param>
         /// <returns></returns>
-        private static List<Post> SelectionLoadedPosts(WallGetObject wallPosts, ref bool allPostsRecieved, DateTime monitoringTimeBorder)
+        private static List<Post> SelectionLoadedPosts(WallGetObject wallPosts, ref bool allPostsReceived, DateTime monitoringTimeBorder)
         {
             List<Post> res = new List<Post>();
             for (int i = 0; i < wallPosts.WallPosts.Count; i++)
@@ -146,7 +147,7 @@ namespace VkNet
                     res.Add(post);
                 else
                 {
-                    allPostsRecieved = false;
+                    allPostsReceived = false;
                     break;
                 }
             }
@@ -154,14 +155,14 @@ namespace VkNet
         }
 
         /// <summary>
-        /// 
+        /// Из загруженных постов выбирает максимальное количество не превышающий параметр monitoringLimit(количество). Назад возвращает сколько постов выбрано (monitoringNumBorder)
         /// </summary>
-        /// <param name="wallPosts"></param>
-        /// <param name="flag"></param>
+        /// <param name="wallPosts">Посты, из которых надо выбрать необходимые</param>
+        /// <param name="allPostsReceived">>Флаг, отвечающий, что все необходимые посты выбраны</param>
         /// <param name="monitoringNumBorder"></param>
         /// <param name="monitoringLimit"></param>
         /// <returns></returns>
-        private static List<Post> SelectionLoadedPosts(WallGetObject wallPosts, ref bool flag, ref long? monitoringNumBorder, int monitoringLimit)
+        private static List<Post> SelectionLoadedPosts(WallGetObject wallPosts, ref bool allPostsReceived, ref long? monitoringNumBorder, int monitoringLimit)
         {
             List<Post> res = new List<Post>();
             for (int i = 0; i < wallPosts.WallPosts.Count; i++)
@@ -174,14 +175,23 @@ namespace VkNet
                 }
                 else
                 {
-                    flag = false;
+                    allPostsReceived = false;
                     break;
                 }
             }
             return res;
         }
 
-        private static List<Post> SelectionLoadedPosts(WallGetObject wallPosts, ref bool flag, DateTime monitoringTimeBorder, ref long? monitoringNumBorder, int monitoringLimit)
+        /// <summary>
+        /// Из загруженных постов выбирает сверху все, пока не дойдет до границы: будет  выбрано не меньше monitoringLimit штук и и все посты до monitoringTimeBorder
+        /// </summary>
+        /// <param name="wallPosts">Посты, из которых надо выбрать необходимые</param>
+        /// <param name="allPostsReceived">Флаг, отвечающий, что все необходимые посты выбраны</param>
+        /// <param name="monitoringTimeBorder">Временнная граница</param>
+        /// <param name="monitoringNumBorder">Количество выбранных постов</param>
+        /// <param name="monitoringLimit">Количественная граница</param>
+        /// <returns></returns>
+        private static List<Post> SelectionLoadedPosts(WallGetObject wallPosts, ref bool allPostsReceived, DateTime monitoringTimeBorder, ref long? monitoringNumBorder, int monitoringLimit)
         {
             List<Post> res = new List<Post>();
             for (int i = 0; i < wallPosts.WallPosts.Count; i++)
@@ -194,52 +204,64 @@ namespace VkNet
                 }
                 else
                 {
-                    flag = false;
+                    allPostsReceived = false;
                     break;
                 }
             }
             return res;
         }
 
-        private static WallGetObject LoadPosts(IWallCategory wall, long groupId, WallFilter filter, int count, ulong offset)
+        private static WallGetObject LoadPosts(IWallCategory wall,
+            ILogger logger,
+            DownloadingPostsOptions downloadingPostsOptions,
+            int count,
+            ulong offset)
         {
             byte countOfLoadingAttempts = 1;
+            DateTime? firstDisconnectionTime = null;
             while (countOfLoadingAttempts <= 5)
             {
                 try
                 {
                     // получаем следующую сотню записей со стены
-                    var wallPosts = wall.Get(new Model.RequestParams.WallGetParams()
+                    var wallPosts = wall.Get(new VkNet.Model.RequestParams.WallGetParams()
                     {
-                        // Идентификатор пользователя или сообщества, со стены которого необходимо получить записи
-                        OwnerId = groupId,
-                        //Domain 
+                        OwnerId = downloadingPostsOptions.WallId,
                         Offset = offset,
                         Count = Convert.ToUInt64(count),
                         Extended = false,
-                        Filter = filter,
-                        // Список дополнительных полей для профилей и групп
-                        //Fields
+                        Filter = downloadingPostsOptions.WallFilter,
                     });
                     return wallPosts;
                 }
+                catch (FlurlHttpException ex)
+                {
+                    logger.LogInformation($"There's no connection to the Internet. Waiting for a reconnection.... Bz-z-z");
+                    if (firstDisconnectionTime == null)
+                        firstDisconnectionTime = DateTime.UtcNow;
+                    if (DateTime.UtcNow - firstDisconnectionTime > downloadingPostsOptions.TimeForReconnection)
+                    {
+                        logger.LogInformation($"No Internet connection. Try to pray to God or just resolve connection problem.{NewLine}{ex}");
+                        throw;
+                    }
+                }
                 catch (CaptchaNeededException ex)
                 {
-                    //_logger.LogError($"{nameof(VkNetExtWallWatcher)}: Error while processing wall post deletion. Failed to load posts. Offset: {offset}.{Environment.NewLine}{ex.Message}");
-                    throw ex;
+                    logger.LogInformation($"Captcha problem. Apply to poor indian children.{NewLine}{ex}");
+                    throw;
                 }
                 catch (VkApiException vkApiEx)
                 {
                     if (countOfLoadingAttempts == 5)
                     {
-                        //_logger.LogError($"{nameof(VkNetExtWallWatcher)}: Error while processing wall post deletion. Failed to load posts. Offset: {offset}.{Environment.NewLine}{vkApiEx.Message}");
-                        throw vkApiEx;
+                        logger.LogInformation($"VkApiException has occured.{NewLine}{vkApiEx.Message}");
+                        throw;
                     }
                     countOfLoadingAttempts++;
                 }
                 catch (System.Exception ex)
                 {
-                    //_logger.LogError($"{nameof(VkNetExtWallWatcher)}: Error while processing wall post deletion. Failed to load posts. Offset: {offset}.{Environment.NewLine}{ex.Message}");
+                    logger.LogInformation($"Unpredictable exception happened. Say \"Vladik Spasi\".{NewLine}{ex}");
                     throw ex;
                 }
             }

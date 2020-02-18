@@ -1,8 +1,8 @@
 ﻿using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using PostsProvider;
-using PrimaryWallWatcher.PostsProvider;
 using VkNet.Enums.SafetyEnums;
 
 namespace PrimaryWallWatcher.PostsProvider
@@ -10,24 +10,19 @@ namespace PrimaryWallWatcher.PostsProvider
     public class PostsProvider : IPostsProvider
     {
         // wallId - Dict<postId, post>
-        private Dictionary<long, Dictionary<long, PostModel>> _posts = new Dictionary<long, Dictionary<long, PostModel>>();
+        private readonly ConcurrentDictionary<long, Dictionary<long, PostModel>> _posts = new ConcurrentDictionary<long, Dictionary<long, PostModel>>();
         // wallId - Dict<PostType, posts>
-        private Dictionary<long, Dictionary<PostType, List<PostModel>>> _postsByType =  new Dictionary<long, Dictionary<PostType, List<PostModel>>>();
+        private readonly ConcurrentDictionary<long, Dictionary<PostType, List<PostModel>>> _postsByType =  new ConcurrentDictionary<long, Dictionary<PostType, List<PostModel>>>();
         
-        public PostsProvider()
-        {
-
-        }
-
         public void AddPost(long wallId, PostModel post) 
         {
             if (!_posts.ContainsKey(wallId))
             {
-                _posts[wallId] = new Dictionary<long, PostModel> { [post.Post.Id.Value] = post };
+                _posts[wallId] = new Dictionary<long, PostModel> { [post.PostId] = post };
                 _postsByType[wallId] = new Dictionary<PostType, List<PostModel>> { [post.Post.PostType] = new List<PostModel>{ post } };
                 return;
             }
-            _posts[wallId][post.Post.Id.Value] = post;
+            _posts[wallId][post.PostId] = post;
             if (!_postsByType[wallId].ContainsKey(post.Post.PostType))
             {
                 _postsByType[wallId][post.Post.PostType] = new List<PostModel> { post };
@@ -39,20 +34,22 @@ namespace PrimaryWallWatcher.PostsProvider
 
         public void UpdatePost(long wallId, PostModel post)
         {
-            if (_posts[wallId][post.Post.Id.Value] != null)
+            if (_posts[wallId][post.PostId] != null)
             {
-                _posts[wallId][post.Post.Id.Value] = post;
+                _posts[wallId][post.PostId] = post;
             }
             else
                 AddPost(wallId, post);
         }
 
-        public void DeletePost (long wallId, long postId)
+        public bool DeletePost(long wallId, long postId)
         {
-            if (_posts[wallId][postId] != null)
+            if (_posts[wallId][postId] != null && _posts[wallId][postId].PostStatus == 1)
             {
-                _posts[wallId][postId].PostStatus = 0;    // marked as deleted
+                _posts[wallId][postId].PostStatus = 0; // marked as deleted
+                return true;
             }
+            return false;
         }
 
         public PostModel GetPostById(long wallId, long postId)
@@ -65,11 +62,16 @@ namespace PrimaryWallWatcher.PostsProvider
 
         public List<PostModel> GetPreList(long wallId, IEnumerable<PostType> postTypes, long idBorderInPreList)
         {
+            // TODO: что будем делать с сортировкой
             if (_posts.ContainsKey(wallId))
+            {
                 return _posts[wallId]
                     .Where(e => e.Key >= idBorderInPreList && postTypes.Contains(e.Value.Post.PostType) && e.Value.PostStatus == 1)
                     .Select(e => e.Value)
+                    .OrderByDescending(e => e.PostId)
                     .ToList();
+            }
+
             return new List<PostModel>();
         }
 
@@ -87,13 +89,13 @@ namespace PrimaryWallWatcher.PostsProvider
             return res;
         }
 
-        public long GetMinIdForPeriod(long wallId, PostType[] postypes, TimeSpan period)
+        public long GetMinIdForPeriod(long wallId, PostType[] postTypes, TimeSpan period)
         {
            DateTime border = DateTime.Now - period;
-           List<long> r = new List<long>(postypes.Count());
+           List<long> r = new List<long>(postTypes.Count());
            if (_posts.ContainsKey(wallId))
            {
-               foreach (var postType in postypes)
+               foreach (var postType in postTypes)
                {
                    if (_postsByType[wallId].ContainsKey(postType))
                        r.Add(_postsByType[wallId][postType].Where(e => e.Post.Date < border).Take(1).FirstOrDefault()?.Post?.Id ?? 0);
@@ -105,7 +107,7 @@ namespace PrimaryWallWatcher.PostsProvider
            return 0;
         }
 
-        public long GetIdNPostFromTop(long wallId, PostType[] postypes, int num)
+        public long GetIdNumPostFromTop(long wallId, PostType[] postypes, int num)
         {
             IEnumerable<long> list = Array.Empty<long>();
             if (_postsByType.ContainsKey(wallId))

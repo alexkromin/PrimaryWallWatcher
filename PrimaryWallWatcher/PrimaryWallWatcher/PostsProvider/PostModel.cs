@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Security.Cryptography;
 using System.Text;
+using System.Linq;
 using VkNet.Model.Attachments;
 
 namespace PostsProvider
@@ -10,6 +11,10 @@ namespace PostsProvider
     {
 
         public Post Post;
+
+        // ReSharper disable once PossibleInvalidOperationException
+        public long PostId => Post.Id.Value;
+
         public string ContentHash { get; set; }
         public int PostStatus { get; set; } = 0;  // 0 - deleted, 1 - exists
         public DateTime EditingDateTime { get; set; }
@@ -29,7 +34,9 @@ namespace PostsProvider
 
         public static string GetContentHash(Post post)
         {
-            return GetMd5Hash(post.Text + string.Join(" ", post.Attachments));
+            var attaches = post.Attachments.Select(e => e.Instance.ToString());
+            string attach = string.Join(" ", attaches);
+            return GetMd5Hash(post.Text + attach);
         }
 
 

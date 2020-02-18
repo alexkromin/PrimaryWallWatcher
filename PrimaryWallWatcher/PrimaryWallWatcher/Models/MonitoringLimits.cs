@@ -1,21 +1,54 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Text;
+using System.Diagnostics;
 
 namespace VkNetExtend.WallWatcher.Models
 {
+    [DebuggerDisplay("{MonitoringPeriod} - {MonitoringLimit}")]
     public class MonitoringLimits
     {
-        public TimeSpan? MonitoringPeriod { get; set; }
+        /// <summary>
+        /// Time limit
+        /// </summary>
+        public TimeSpan? MonitoringPeriod { get; private set; } = null;
 
-        public int? MonitoringLimit { get; set; }
+        /// <summary>
+        /// Count limit
+        /// </summary>
+        public int? MonitoringLimit { get; private set; } = null;
 
-        public MonitoringLimits(TimeSpan? monitoringPeriod, int? monitoringLimit)
+        private string DEBUGGER_INFO
         {
-            if (monitoringPeriod == null && monitoringLimit == null)
-                throw new Exception("Один из параметров должен быть не NULL");
+            get
+            {
+                if (MonitoringPeriod.HasValue && MonitoringLimit.HasValue)
+                {
+                    return $"Last {MonitoringLimit} for {MonitoringPeriod}.";
+                }
+                else if (MonitoringPeriod.HasValue)
+                {
+                    return $"For last {MonitoringPeriod}.";
+                }
+                else
+                {
+                    return $"Last {MonitoringLimit}.";
+                }
+            }
+        }
+
+        public MonitoringLimits(TimeSpan monitoringPeriod)
+        {
             MonitoringPeriod = monitoringPeriod;
-            MonitoringLimit  = monitoringLimit;
+        }
+
+        public MonitoringLimits(int monitoringLimit)
+        {
+            MonitoringLimit = monitoringLimit;
+        }
+
+        public MonitoringLimits(TimeSpan monitoringPeriod, int monitoringLimit)
+        {
+            MonitoringPeriod = monitoringPeriod;
+            MonitoringLimit = monitoringLimit;
         }
     }
 }
